@@ -1,25 +1,41 @@
 // SPDX-License-Identifier: GPL-3.0
 pragma solidity >= 0.8.0 < 0.9.0;
+pragma experimental ABIEncoderV2;
 
 import './interfaces/ICERC20.sol';
 import './interfaces/IERC20.sol';
 import './interfaces/ICETH.sol';
 import './interfaces/IComptroller.sol';
 
+import "@chainlink/contracts/src/v0.8/interfaces/KeeperCompatibleInterface.sol";
+
+import {
+    ISuperfluid,
+    ISuperToken,
+    ISuperApp,
+    ISuperAgreement,
+    ContextDefinitions,
+    SuperAppDefinitions
+} from "@superfluid-finance/ethereum-contracts/contracts/interfaces/superfluid/ISuperfluid.sol";
+
+import { IConstantFlowAgreementV1 } from "@superfluid-finance/ethereum-contracts/contracts/interfaces/agreements/IConstantFlowAgreementV1.sol";
+
 ///@author StreamRoll team:)
 ///@title StreamRollV1
 ///@notice it accepts eth as collateral and exchanges it for
 ///cEth.. Everything happens inside the contract, behaving like a pool.
 /// It then streams chunks to the desired accounts.
-contract StreamRollV1 {
+contract StreamRollV1 is KeeperCompatibleInterface {
     
     ICETH cEth;
     ICERC20 cDai;
     IComptroller comptroller;
 
+    uint public immutable interval;
+    uint public lastTimeStamp;
+    uint public number;
 
     event Log(string, address, uint);
-
 
     ///@dev To keep track of balances and authorize
     ///transactions. balances = wei. wei = 1 eth * 10 ^18
@@ -29,13 +45,16 @@ contract StreamRollV1 {
     mapping(address => uint) public checkout;
     mapping(address => uint) public borrowedBalances;
 
-
     ///@dev cEth --> the contract's address for cEther on rinkeby
     ///cDai--> the contract's address for cDai on rinkeby
     constructor() {
-        cEth = ICETH(0xd6801a1DfFCd0a410336Ef88DeF4320D6DF1883e); 
-        cDai = ICERC20(0x6D7F0754FFeb405d23C51CE938289d4835bE3b14);
-        comptroller = IComptroller(0x2EAa9D77AE4D8f9cdD9FAAcd44016E746485bddb);
+        ///@dev Kovan addresses
+        cEth = ICETH(0x41B5844f4680a8C38fBb695b7F9CFd1F64474a72); 
+        cDai = ICERC20(0xF0d0EB522cfa50B716B3b1604C4F0fA6f04376AD);
+        comptroller = IComptroller(0x5eAe89DC1C671724A672ff0630122ee834098657);
+
+        interval = 180;
+        lastTimeStamp = block.timestamp;
     }
 
     receive() external payable {}
@@ -93,8 +112,10 @@ contract StreamRollV1 {
     ///user's collateral balance multiplied by the collateral factor * exchange rate
     function borrowFromCompound(uint _amount) public payable returns (bool) {
         address[] memory cTokens = new address[](2);
-        cTokens[0] = 0xd6801a1DfFCd0a410336Ef88DeF4320D6DF1883e;
-        cTokens[1] = 0x6D7F0754FFeb405d23C51CE938289d4835bE3b14;
+        // kovan cETH address
+        cTokens[0] = 0x41B5844f4680a8C38fBb695b7F9CFd1F64474a72;
+        // kovan cDAI address
+        cTokens[1] = 0xF0d0EB522cfa50B716B3b1604C4F0fA6f04376AD;
         uint[] memory errors = comptroller.enterMarkets(cTokens);
         if (errors[0] != 0) {
            revert("Comptroller.enterMarkets failed");
@@ -117,18 +138,36 @@ contract StreamRollV1 {
     ///@dev repays the borrowed amount in dai
     ///@param _repayAmount = dai * 10 ^18
     function repayDebt(uint _repayAmount) external returns (bool) {
-        IERC20 underlying = IERC20(0x5592EC0cfb4dbc12D3aB100b257153436a1f0FEa);
-        underlying.approve(0x6D7F0754FFeb405d23C51CE938289d4835bE3b14, _repayAmount);
+        // kovan DAI address
+        IERC20 underlying = IERC20(0x4F96Fe3b7A6Cf9725f59d353F723c1bDb64CA6Aa);
+        // kovan cDAI address
+        underlying.approve(0xF0d0EB522cfa50B716B3b1604C4F0fA6f04376AD, _repayAmount);
         require(cDai.repayBorrow(_repayAmount) == 0, "Error in repayBorrow()");
         borrowedBalances[msg.sender] -= _repayAmount;
         return true;
     }
+    
+    ///////////////////////////////////////////////////////////////////////////////
+    ////////////////////////////////  KEEPER INTERFACE  ///////////////////////////
+    ///////////////////////////////////////////////////////////////////////////////     
+
+    function math() public returns (uint) {
+        number = number + 2;
+    } 
+
+    function checkUpkeep(bytes calldata checkData) 
+        external override view returns (bool upkeepNeeded, bytes memory performData) {
+            upkeepNeeded = (block.timestamp - lastTimeStamp) > interval;
+
+            performData = checkData;
+    }
+
+    function performUpkeep(bytes calldata performData) external override {
+        lastTimeStamp = block.timestamp;
+        math();
+        borrowFromCompound(.01 * 10 ** 18);
+        
+
+        performData;
+    }
 }
-
-
-
-
-
-
-
-

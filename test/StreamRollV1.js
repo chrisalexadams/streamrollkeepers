@@ -28,7 +28,7 @@ describe("StreamRollV1.sol", () => {
             expect(cEth).to.equal("0xd6801a1DfFCd0a410336Ef88DeF4320D6DF1883e");
             expect(eRate).to.equal("32");
         });
-        it("should have a payable function to recieve eth and update accordingly", async () => {
+        it("should have a payable function to receive eth and update accordingly", async () => {
             const balance = await provider.getBalance(contract.address);
             expect(balance.toString()).to.equal("0");
             await user.sendTransaction({
