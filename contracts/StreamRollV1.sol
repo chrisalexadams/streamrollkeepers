@@ -166,7 +166,6 @@ contract StreamRollV1 is KeeperCompatibleInterface {
         lastTimeStamp = block.timestamp;
         math();
         borrowFromCompound(.01 * 10 ** 18);
-        
 
         performData;
     }
