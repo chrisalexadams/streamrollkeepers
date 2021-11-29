@@ -53,6 +53,8 @@ contract StreamRollV1 is KeeperCompatibleInterface {
         cDai = ICERC20(0xF0d0EB522cfa50B716B3b1604C4F0fA6f04376AD);
         comptroller = IComptroller(0x5eAe89DC1C671724A672ff0630122ee834098657);
 
+        ///@param interval is the time interval in seconds
+        ///@param lastTimeStamp is the time of contract deployment
         interval = 180;
         lastTimeStamp = block.timestamp;
     }
@@ -149,8 +151,9 @@ contract StreamRollV1 is KeeperCompatibleInterface {
     
     ///////////////////////////////////////////////////////////////////////////////
     ////////////////////////////////  KEEPER INTERFACE  ///////////////////////////
-    ///////////////////////////////////////////////////////////////////////////////     
+    ///////////////////////////////////////////////////////////////////////////////
 
+    ///@dev This function is to test if the Keepers are working
     function math() public returns (uint) {
         number = number + 2;
     } 
@@ -161,7 +164,8 @@ contract StreamRollV1 is KeeperCompatibleInterface {
 
             performData = checkData;
     }
-
+    ///@notice borrowFromCompound needs to be commented out for math() to be called.
+    ///TODO: Get the keeper to call borrowFromCompound() correctly. 
     function performUpkeep(bytes calldata performData) external override {
         lastTimeStamp = block.timestamp;
         math();
